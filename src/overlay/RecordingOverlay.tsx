@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./RecordingOverlay.css";
+import { barLevels } from "./barLevels";
 import { commands, events } from "@/bindings";
 import type {
   StreamPhase,
@@ -45,6 +46,7 @@ const RecordingOverlay: React.FC = () => {
   const [overflowing, setOverflowing] = useState(false);
 
   const smoothedLevelsRef = useRef<number[]>(Array(16).fill(0));
+  const noiseFloorRef = useRef(1);
   // Live-text scroll-back: the text region "sticks" to the newest line while the
   // user is at the bottom; if they scroll up to read history, auto-follow pauses
   // until they scroll back down.
@@ -62,6 +64,7 @@ const RecordingOverlay: React.FC = () => {
         if (overlayState === "recording" || overlayState === "streaming") {
           setCaptureReady(false);
           smoothedLevelsRef.current = Array(16).fill(0);
+          noiseFloorRef.current = 1;
           setLevels(Array(WAVE_BARS).fill(0));
           setStreamText({ committed: "", tentative: "" });
         }
@@ -105,10 +108,12 @@ const RecordingOverlay: React.FC = () => {
         // bars for the shared waveform.
         const smoothed = smoothedLevelsRef.current.map((prev, i) => {
           const target = newLevels[i] || 0;
-          return prev * 0.7 + target * 0.3;
+          return prev * 0.5 + target * 0.5;
         });
         smoothedLevelsRef.current = smoothed;
-        setLevels(smoothed.slice(0, WAVE_BARS));
+        const { bars, floor } = barLevels(smoothed, noiseFloorRef.current);
+        noiseFloorRef.current = floor;
+        setLevels(bars);
       });
 
       const unlistenStream = await events.streamTextEvent.listen((event) => {
@@ -176,7 +181,7 @@ const RecordingOverlay: React.FC = () => {
         <i
           key={i}
           style={{
-            height: `${Math.max(3, Math.min(18, 3 + Math.pow(v, 0.7) * 15))}px`,
+            height: `${2 + v * 12}px`,
           }}
         />
       ))}
@@ -296,7 +301,10 @@ const RecordingOverlay: React.FC = () => {
       <div
         className={`scard compact ${working && isVisible ? "cworking" : ""}`}
       >
-        {working ? workingRow(workLabel, true) : listeningRow(false, true)}
+        {/* Local mod: tiny pill, no dot, label or cancel button. Esc still cancels. */}
+        <div className="sbase" aria-label={working ? workLabel : undefined}>
+          {working ? <span className="sspinner" /> : waveform}
+        </div>
       </div>
     </div>
   );
