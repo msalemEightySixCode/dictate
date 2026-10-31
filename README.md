@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Dictate: speak, and your words appear where your cursor is" width="100%">
+  <img src="docs/assets/banner.png" alt="Dictate: speech to text. Local. Free." width="100%">
 </p>
 
 <p align="center">
